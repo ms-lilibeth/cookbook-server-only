@@ -12,9 +12,18 @@ import os
 from datetime import datetime
 
 
-def get_new_records(last_updated):
-    result = {NEW_UPDATED_FIELD_NAME: int(datetime.timestamp(datetime.now()))}
+# ======================================== Aliases
+RECIPES_FIELD_NAME = 'recipes'
+CATEGORIES_FIELD_NAME = 'categories'
+INGREDIENTS_FIELD_NAME = 'ingredients'
+RECIPE_INGREDIENTS_FIELD_NAME = 'recipeIngredients'
+NEW_UPDATED_FIELD_NAME = 'newUpdated'
+# ========================================
 
+def get_new_records(last_updated):
+    result = {CATEGORIES_FIELD_NAME: [], INGREDIENTS_FIELD_NAME: [], RECIPES_FIELD_NAME: [],
+              RECIPE_INGREDIENTS_FIELD_NAME: [],
+              NEW_UPDATED_FIELD_NAME: int(datetime.timestamp(datetime.now()))}
     try:
 
         """ Adding recipes """
@@ -33,8 +42,29 @@ def get_new_records(last_updated):
             tmp_rec['category'] = s.category.id
             recipes.append(tmp_rec)
         result[RECIPES_FIELD_NAME] = recipes
-        del recipes
 
+        recipes = [r['id'] for r in recipes]
+        """ Adding recipe-ingredients connections """
+        select_result = models.RecipeIngredient.select()
+        select_result = models.RecipeIngredient.select().where(models.RecipeIngredient.recipe_id in recipes)
+        rec_ing = []
+
+        for s in select_result:
+            if s.id is None:
+                continue
+            tmp_rec_ing = {}
+            tmp_rec_ing['id'] = s.id
+            tmp_rec_ing['resId'] = s.recipe_id
+            tmp_rec_ing['ingId'] = s.ingredient_id
+            tmp_rec_ing['quantity'] = s.quantity
+            rec_ing.append(tmp_rec_ing)
+        result[RECIPE_INGREDIENTS_FIELD_NAME] = rec_ing
+        del rec_ing
+
+    except peewee.DoesNotExist:
+        pass
+
+    try:
         """ Adding categories """
         select_result = models.Category.select().where(models.Category.timestamp_added > last_updated)
         categories = []
@@ -48,7 +78,10 @@ def get_new_records(last_updated):
             categories.append(tmp_cat)
         result[CATEGORIES_FIELD_NAME] = categories
         del categories
+    except peewee.DoesNotExist:
+        pass
 
+    try:
         """Adding ingredients """
         select_result = models.Ingredient.select().where(models.Ingredient.timestamp_added > last_updated)
         ingredients = []
@@ -62,58 +95,10 @@ def get_new_records(last_updated):
             ingredients.append(tmp_ing)
         result[INGREDIENTS_FIELD_NAME] = ingredients
         del ingredients
-
     except peewee.DoesNotExist:
-        result = {CATEGORIES_FIELD_NAME: [], INGREDIENTS_FIELD_NAME: [], RECIPES_FIELD_NAME: [],
-                  RECIPE_INGREDIENTS_FIELD_NAME: [],
-                  NEW_UPDATED_FIELD_NAME: int(datetime.timestamp(datetime.now()))}
+        pass
 
     return result
-
-
-class MainHandler(tornado.web.RequestHandler):
-    def data_received(self, chunk):
-        pass
-
-    def get(self):
-        self.write("Hello, world\n")
-
-
-class DeltaHandler(tornado.web.RequestHandler):
-    def data_received(self, chunk):
-        pass
-
-    def get(self):
-        last_updated = self.get_argument('lastUpdated', None)
-
-        if not last_updated:
-            self.write('Invalid arguments')
-            return
-
-        try:
-            last_updated = int(last_updated)
-        except ValueError:
-            self.write('Invalid arguments')
-            return
-        try:
-            result = json.dumps(get_new_records(last_updated), ensure_ascii=False).encode('utf8')
-            result_size = sys.getsizeof(result)
-            result = {'delta': result_size / 1048576}  # result in MB
-        except peewee.DoesNotExist:
-            result = {'delta': -1}
-
-        self.write(json.dumps(result))
-
-
-# ======================================== Aliases
-RECIPES_FIELD_NAME = 'recipes'
-CATEGORIES_FIELD_NAME = 'categories'
-INGREDIENTS_FIELD_NAME = 'ingredients'
-RECIPE_INGREDIENTS_FIELD_NAME = 'recipeIngredients'
-NEW_UPDATED_FIELD_NAME = 'newUpdated'
-
-
-# ========================================
 
 
 class UpdateHandler(tornado.web.RequestHandler):
