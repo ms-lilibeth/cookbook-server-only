@@ -163,6 +163,5 @@ def make_app():
 if __name__ == '__main__':
     print("Tornado works")
     app = make_app()
-    # app.listen(int(os.environ['PORT']))
-    app.listen(8800)
+    app.listen(int(os.environ['PORT']))
     tornado.ioloop.IOLoop.current().start()
