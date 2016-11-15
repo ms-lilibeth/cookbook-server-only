@@ -100,6 +100,13 @@ def get_new_records(last_updated):
 
     return result
 
+class MainHandler(tornado.web.RequestHandler):
+    def data_received(self, chunk):
+        pass
+
+    def get(self):
+        self.write("Hello, world\n")
+
 
 class UpdateHandler(tornado.web.RequestHandler):
     def data_received(self, chunk):
@@ -120,6 +127,31 @@ class UpdateHandler(tornado.web.RequestHandler):
         self.write(result)
 
 
+class DeltaHandler(tornado.web.RequestHandler):
+    def data_received(self, chunk):
+        pass
+
+    def get(self):
+        last_updated = self.get_argument('lastUpdated', None)
+
+        if not last_updated:
+            self.write('Invalid arguments')
+            return
+
+        try:
+            last_updated = int(last_updated)
+        except ValueError:
+            self.write('Invalid arguments')
+            return
+        try:
+            result = json.dumps(get_new_records(last_updated), ensure_ascii=False).encode('utf8')
+            result_size = sys.getsizeof(result)
+            result = {'delta': result_size / 1048576}  # result in MB
+        except peewee.DoesNotExist:
+            result = {'delta': -1}
+
+        self.write(json.dumps(result))
+
 def make_app():
     return tornado.web.Application([
         (r'/', MainHandler),
@@ -131,5 +163,6 @@ def make_app():
 if __name__ == '__main__':
     print("Tornado works")
     app = make_app()
-    app.listen(int(os.environ['PORT']))
+    # app.listen(int(os.environ['PORT']))
+    app.listen(8800)
     tornado.ioloop.IOLoop.current().start()
